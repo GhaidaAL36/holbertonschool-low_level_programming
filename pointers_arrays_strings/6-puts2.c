@@ -2,16 +2,17 @@
 
 /**
  * puts2 - prints every other character of a string
- * @str: the string to be processed
+ * @str: the string
  */
 void puts2(char *str)
 {
-	int i = 0;
+	int len = 0, i;
 
-	while (str[i] != '\0')
-	{
+	while (str[len] != '\0')
+		len++;
+
+	for (i = 0; i < len; i += 2)
 		_putchar(str[i]);
-		i += 2;
-	}
+
 	_putchar('\n');
 }
