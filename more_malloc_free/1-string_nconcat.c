@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "main.h"
 
 /**
@@ -19,11 +20,9 @@ char *string_nconcat(char *s1, char *s2, unsigned int n)
 	unsigned int copy_len = 0;
 	char *concat;
 
-	while (s1[len1] != '\0')
-		len1++;
+	len1 = (s1 != NULL) ? strlen(s1) : 0;
+	len2 = (s2 != NULL) ? strlen(s2) : 0;
 
-	while (s2[len2] != '\0')
-		len2++;
 
 	if (n > len2)
 		copy_len = len2;
@@ -35,10 +34,12 @@ char *string_nconcat(char *s1, char *s2, unsigned int n)
 	if (!concat)
 		return (NULL);
 
+	if (s1)
 	for (i = 0; i < len1; i++)
 	{
 		concat[i] = s1[i];
 	}
+	if (s2)
 	for (j = 0; j < copy_len; j++)
 	{
 		concat[len1 + j] = s2[j];
