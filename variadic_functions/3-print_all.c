@@ -1,39 +1,45 @@
 #include "variadic_functions.h"
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 /**
- * print_all - prints anything based on a format string
- * @format: list of types of arguments (c, i, f, s)
+ * print_all - prints any type of argument based on format string
+ * @format: string of types (c: char, i: int, f: float, s: string)
  *
- * Description: If a string argument is NULL, prints (nil)
- *              Prints a newline at the end
+ * Description: prints each argument separated by ", ".
+ * If a string is NULL, prints (nil). Prints a newline at the end.
+ * No else/else if is used. Maximum 2 if statements and < 9 variables.
  */
 void print_all(const char * const format, ...)
 {
     va_list args;
     unsigned int i = 0;
     char *str;
-    char *separator = "";
+    char *sep = "";
+
+    if (!format)
+        return;
 
     va_start(args, format);
 
-    while (format && format[i])
+    while (format[i])
     {
         if (format[i] == 'c')
-            printf("%s%c", separator, va_arg(args, int));
+            printf("%s%c", sep, va_arg(args, int));
+
         if (format[i] == 'i')
-            printf("%s%d", separator, va_arg(args, int));
+            printf("%s%d", sep, va_arg(args, int));
+
         if (format[i] == 'f')
-            printf("%s%f", separator, va_arg(args, double));
+            printf("%s%f", sep, va_arg(args, double));
+
         if (format[i] == 's')
         {
             str = va_arg(args, char *);
-            if (!str)
-                str = "(nil)";
-            printf("%s%s", separator, str);
+            printf("%s%s", sep, str ? str : "(nil)");
         }
-        separator = ", ";
+
+        sep = ", ";
         i++;
     }
 
