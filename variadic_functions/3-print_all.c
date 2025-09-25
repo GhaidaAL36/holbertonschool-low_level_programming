@@ -6,9 +6,9 @@
  * print_all - prints anything
  * @format: list of types of arguments
  *
- * Description: c: char, i: integer, f: float, s: string
- * If a string is NULL, prints (nil)
- * Any other character is ignored
+ * Description: c = char, i = int, f = float, s = string
+ * If string is NULL, prints (nil)
+ * Any other char is ignored
  */
 void print_all(const char * const format, ...)
 {
@@ -20,30 +20,31 @@ void print_all(const char * const format, ...)
 
 	while (format && format[i])
 	{
-		if (format[i] == 'c')
+		switch (format[i])
 		{
+		case 'c':
 			printf("%s%c", sep, va_arg(args, int));
-		}
-		if (format[i] == 'i')
-		{
+			break;
+		case 'i':
 			printf("%s%d", sep, va_arg(args, int));
-		}
-		if (format[i] == 'f')
-		{
+			break;
+		case 'f':
 			printf("%s%f", sep, va_arg(args, double));
-		}
-		if (format[i] == 's')
-		{
+			break;
+		case 's':
 			str = va_arg(args, char *);
-			if (!str)
+			if (str == NULL)
 				str = "(nil)";
 			printf("%s%s", sep, str);
+			break;
+		default:
+			i++;
+			continue;
 		}
-		if (format[i] == 'c' || format[i] == 'i' ||
-		    format[i] == 'f' || format[i] == 's')
-			sep = ", ";
+		sep = ", ";
 		i++;
 	}
+
 	printf("\n");
 	va_end(args);
 }
