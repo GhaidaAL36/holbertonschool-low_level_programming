@@ -7,9 +7,9 @@
 #define BUF_SIZE 1024
 
 /**
- * error_exit - print an error message and exit
+ * error_exit - print an error message and exit with a code
  * @msg: message string
- * @file: file name or fd as string
+ * @file: file name or file descriptor string
  * @code: exit code
  */
 void error_exit(const char *msg, const char *file, int code)
@@ -19,30 +19,30 @@ void error_exit(const char *msg, const char *file, int code)
 }
 
 /**
- * safe_close - closes a file descriptor and checks for errors
+ * safe_close - close a file descriptor and check for errors
  * @fd: file descriptor
  */
 void safe_close(int fd)
 {
-	char fd_str[12];
-
 	if (close(fd) == -1)
 	{
+		char fd_str[12];
+
 		snprintf(fd_str, sizeof(fd_str), "%d", fd);
 		error_exit("Can't close fd", fd_str, 100);
 	}
 }
 
 /**
- * copy_file - copy content from one file descriptor to another
+ * copy_content - copy content from source fd to dest fd
  * @fd_from: source file descriptor
  * @fd_to: destination file descriptor
  * @file_from: source file name
  * @file_to: destination file name
  */
-void copy_file(int fd_from, int fd_to, char *file_from, char *file_to)
+void copy_content(int fd_from, int fd_to, char *file_from, char *file_to)
 {
-	ssize_t n_read, n_written, total_written;
+	ssize_t n_read, n_written;
 	char buffer[BUF_SIZE];
 
 	while (1)
@@ -53,23 +53,18 @@ void copy_file(int fd_from, int fd_to, char *file_from, char *file_to)
 		if (n_read == 0)
 			break;
 
-		total_written = 0;
-		while (total_written < n_read)
-		{
-			n_written = write(fd_to, buffer + total_written, n_read - total_written);
-			if (n_written == -1)
-				error_exit("Can't write to", file_to, 99);
-			total_written += n_written;
-		}
+		n_written = write(fd_to, buffer, n_read);
+		if (n_written != n_read)
+			error_exit("Can't write to", file_to, 99);
 	}
 }
 
 /**
- * main - copy the content of a file to another file
+ * main - copies the content of a file to another file
  * @argc: number of arguments
  * @argv: argument vector
  *
- * Return: 0 on success, exits on error
+ * Return: 0 on success, exits on failure
  */
 int main(int argc, char *argv[])
 {
@@ -92,7 +87,7 @@ int main(int argc, char *argv[])
 		error_exit("Can't write to", argv[2], 99);
 	}
 
-	copy_file(fd_from, fd_to, argv[1], argv[2]);
+	copy_content(fd_from, fd_to, argv[1], argv[2]);
 
 	safe_close(fd_from);
 	safe_close(fd_to);
