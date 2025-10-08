@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #define BUF_SIZE 1024
 
@@ -20,15 +19,12 @@ void error_exit(const char *msg, const char *file, int code)
 }
 
 /**
- * check_close - closes a file descriptor and exits if it fails
+ * safe_close - closes a file descriptor and exits if it fails
  * @fd: the file descriptor
  */
-void check_close(int fd)
+void safe_close(int fd)
 {
-	int c;
-
-	c = close(fd);
-	if (c == -1)
+	if (close(fd) == -1)
 	{
 		dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd);
 		exit(100);
@@ -36,16 +32,37 @@ void check_close(int fd)
 }
 
 /**
+ * copy_file - copies content from fd_from to fd_to
+ * @fd_from: source file descriptor
+ * @fd_to: destination file descriptor
+ * @file_from: source filename for error messages
+ * @file_to: destination filename for error messages
+ */
+void copy_file(int fd_from, int fd_to, char *file_from, char *file_to)
+{
+	ssize_t n_read, n_written;
+	char buffer[BUF_SIZE];
+
+	while ((n_read = read(fd_from, buffer, BUF_SIZE)) > 0)
+	{
+		n_written = write(fd_to, buffer, n_read);
+		if (n_written != n_read)
+			error_exit("Can't write to", file_to, 99);
+	}
+	if (n_read == -1)
+		error_exit("Can't read from file", file_from, 98);
+}
+
+/**
  * main - copies the content of a file to another file
  * @argc: number of arguments
  * @argv: arguments (file_from file_to)
  *
- * Return: 0 on success, exits with error codes on failure
+ * Return: 0 on success, exits with proper code on failure
  */
 int main(int argc, char *argv[])
 {
-	int fd_from, fd_to, n_read, n_written;
-	char buffer[BUF_SIZE];
+	int fd_from, fd_to;
 
 	if (argc != 3)
 	{
@@ -57,40 +74,17 @@ int main(int argc, char *argv[])
 	if (fd_from == -1)
 		error_exit("Can't read from file", argv[1], 98);
 
-	n_read = read(fd_from, buffer, BUF_SIZE);
-	if (n_read == -1)
-	{
-		check_close(fd_from);
-		error_exit("Can't read from file", argv[1], 98);
-	}
-
 	fd_to = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
 	if (fd_to == -1)
 	{
-		check_close(fd_from);
+		safe_close(fd_from);
 		error_exit("Can't write to", argv[2], 99);
 	}
 
-	while (n_read > 0)
-	{
-		n_written = write(fd_to, buffer, n_read);
-		if (n_written != n_read)
-		{
-			check_close(fd_from);
-			check_close(fd_to);
-			error_exit("Can't write to", argv[2], 99);
-		}
+	copy_file(fd_from, fd_to, argv[1], argv[2]);
 
-		n_read = read(fd_from, buffer, BUF_SIZE);
-		if (n_read == -1)
-		{
-			check_close(fd_from);
-			check_close(fd_to);
-			error_exit("Can't read from file", argv[1], 98);
-		}
-	}
+	safe_close(fd_from);
+	safe_close(fd_to);
 
-	check_close(fd_from);
-	check_close(fd_to);
 	return (0);
 }
