@@ -42,18 +42,26 @@ void safe_close(int fd)
  */
 void copy_file(int fd_from, int fd_to, char *file_from, char *file_to)
 {
-	ssize_t n_read, n_written;
+	ssize_t n_read, n_written, total_written;
 	char buffer[BUF_SIZE];
 
-	while ((n_read = read(fd_from, buffer, BUF_SIZE)) > 0)
+	while (1)
 	{
-		n_written = write(fd_to, buffer, n_read);
-		if (n_written != n_read)
-			error_exit("Can't write to", file_to, 99);
-	}
+		n_read = read(fd_from, buffer, BUF_SIZE);
+		if (n_read == -1)
+			error_exit("Can't read from file", file_from, 98);
+		if (n_read == 0)
+			break;
 
-	if (n_read == -1)
-		error_exit("Can't read from file", file_from, 98);
+		total_written = 0;
+		while (total_written < n_read)
+		{
+			n_written = write(fd_to, buffer + total_written, n_read - total_written);
+			if (n_written == -1)
+				error_exit("Can't write to", file_to, 99);
+			total_written += n_written;
+		}
+	}
 }
 
 /**
@@ -85,6 +93,7 @@ int main(int argc, char *argv[])
 	}
 
 	copy_file(fd_from, fd_to, argv[1], argv[2]);
+
 	safe_close(fd_from);
 	safe_close(fd_to);
 
