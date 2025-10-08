@@ -7,37 +7,49 @@
 #define BUF_SIZE 1024
 
 /**
- * main - copies the content of a file to another file
- * @ac: number of arguments
- * @av: array of arguments
- *
- * Return: 0 on success, exits on failure
+ * error_exit - prints an error message and exits
+ * @msg: message to print
+ * @file: file name
+ * @code: exit code
  */
-int main(int ac, char **av)
+void error_exit(const char *msg, const char *file, int code)
 {
-	int fd_from, fd_to;
-	ssize_t n_read, n_written;
+	dprintf(STDERR_FILENO, "Error: %s %s\n", msg, file);
+	exit(code);
+}
+
+/**
+ * check_close - closes a file descriptor and exits on failure
+ * @fd: file descriptor to close
+ */
+void check_close(int fd)
+{
+	if (close(fd) == -1)
+	{
+		dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd);
+		exit(100);
+	}
+}
+
+/**
+ * copy_file - copies content of one file to another
+ * @file_from: source file
+ * @file_to: destination file
+ */
+void copy_file(const char *file_from, const char *file_to)
+{
+	int fd_from, fd_to, n_read, n_written;
 	char buffer[BUF_SIZE];
 
-	if (ac != 3)
-	{
-		dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
-		exit(97);
-	}
-
-	fd_from = open(av[1], O_RDONLY);
+	fd_from = open(file_from, O_RDONLY);
 	if (fd_from == -1)
-	{
-		dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", av[1]);
-		exit(98);
-	}
+		error_exit("Can't read from file", file_from, 98);
 
-	fd_to = open(av[2], O_CREAT | O_WRONLY | O_TRUNC, 0664);
+	fd_to = open(file_to, O_WRONLY | O_CREAT | O_TRUNC, 0664);
 	if (fd_to == -1)
 	{
-		dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
 		close(fd_from);
-		exit(99);
+		error_exit("Can't write to", file_to, 99);
 	}
 
 	while ((n_read = read(fd_from, buffer, BUF_SIZE)) > 0)
@@ -45,32 +57,38 @@ int main(int ac, char **av)
 		n_written = write(fd_to, buffer, n_read);
 		if (n_written != n_read)
 		{
-			dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
 			close(fd_from);
 			close(fd_to);
-			exit(99);
+			error_exit("Can't write to", file_to, 99);
 		}
 	}
 
 	if (n_read == -1)
 	{
-		dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", av[1]);
 		close(fd_from);
 		close(fd_to);
-		exit(98);
+		error_exit("Can't read from file", file_from, 98);
 	}
 
-	if (close(fd_from) == -1)
+	check_close(fd_from);
+	check_close(fd_to);
+}
+
+/**
+ * main - entry point, checks args and calls copy_file
+ * @ac: argument count
+ * @av: argument vector
+ *
+ * Return: 0 on success
+ */
+int main(int ac, char **av)
+{
+	if (ac != 3)
 	{
-		dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd_from);
-		exit(100);
+		dprintf(STDERR_FILENO, "Usage: %s file_from file_to\n", av[0]);
+		exit(97);
 	}
 
-	if (close(fd_to) == -1)
-	{
-		dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd_to);
-		exit(100);
-	}
-
+	copy_file(av[1], av[2]);
 	return (0);
 }
