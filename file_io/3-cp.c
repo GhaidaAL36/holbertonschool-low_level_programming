@@ -10,7 +10,7 @@
 /**
  * exit_error - Prints an error message and exits with the given code.
  * @code: Exit code (97, 98, 99, or 100)
- * @msg: Error message (Usage, Can't read/write/close)
+ * @msg: Error message
  * @file: Related filename (can be NULL)
  */
 void exit_error(int code, const char *msg, const char *file)
@@ -33,7 +33,8 @@ void close_file(int fd)
 }
 
 /**
- * open_dest - Opens destination file with 0664 perms.
+ * open_dest - Opens the destination file with correct permissions.
+ * If the file exists, it checks write permission and truncates.
  * @path: Destination filename.
  * Return: File descriptor.
  */
@@ -47,14 +48,11 @@ int open_dest(const char *path)
 
 	if (errno == EEXIST)
 	{
-		fd = open(path, O_WRONLY | O_TRUNC, 0664);
+		if (access(path, W_OK) == -1)
+			exit_error(99, "Error: Can't write to", path);
+		fd = open(path, O_WRONLY | O_TRUNC);
 		if (fd == -1)
 			exit_error(99, "Error: Can't write to", path);
-		if (fchmod(fd, 0664) == -1)
-		{
-			close(fd);
-			exit_error(99, "Error: Can't write to", path);
-		}
 		return (fd);
 	}
 
@@ -63,34 +61,31 @@ int open_dest(const char *path)
 }
 
 /**
- * copy_contents - Copies data from src_fd to dst_fd.
+ * copy_contents - Copies data from src_fd to dst_fd using 1024-byte buffer.
+ * Exits with 98 or 99 on read/write errors.
  * @src_fd: Source file descriptor.
  * @dst_fd: Destination file descriptor.
  * @src_name: Source filename.
  * @dst_name: Destination filename.
  */
-void copy_contents(int src_fd, int dst_fd, const char *src_name,
-				   const char *dst_name)
+void copy_contents(int src_fd, int dst_fd, const char *src_name, const char *dst_name)
 {
 	ssize_t r, w;
 	char buf[BUF_SIZE];
 
-	while (1)
+	while ((r = read(src_fd, buf, BUF_SIZE)) > 0)
 	{
-		r = read(src_fd, buf, BUF_SIZE);
-		if (r == -1)
-			exit_error(98, "Error: Can't read from file", src_name);
-		if (r == 0)
-			break;
-
 		w = write(dst_fd, buf, r);
 		if (w == -1 || w != r)
 			exit_error(99, "Error: Can't write to", dst_name);
 	}
+	if (r == -1)
+		exit_error(98, "Error: Can't read from file", src_name);
 }
 
 /**
- * main - Copies the content of one file into another.
+ * main - Copies the content of one file to another.
+ * Usage: cp file_from file_to
  * @argc: Argument count.
  * @argv: Argument values.
  * Return: 0 on success.
@@ -107,6 +102,7 @@ int main(int argc, char **argv)
 		exit_error(98, "Error: Can't read from file", argv[1]);
 
 	fd_to = open_dest(argv[2]);
+
 	copy_contents(fd_from, fd_to, argv[1], argv[2]);
 
 	close_file(fd_from);
