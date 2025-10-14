@@ -88,7 +88,7 @@ int main(int ac, char **av)
         exit(97);
     }
 
-    /* افتح الملف المصدر أولاً */
+    /* افتح الملف المصدر */
     f_from = open(av[1], O_RDONLY);
     if (f_from == -1)
     {
@@ -99,7 +99,15 @@ int main(int ac, char **av)
     /* اقرأ أول بايت للتأكد من إمكانية القراءة */
     r = read_retry(f_from, buf, 1, av[1]);
 
-    /* افتح الملف الوجهة بعد التأكد من قراءة الملف المصدر */
+    /* تحقق من صلاحيات الملف الوجهة إذا موجود */
+    if (access(av[2], F_OK) == 0 && access(av[2], W_OK) != 0)
+    {
+        dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
+        close_or_die(f_from);
+        exit(99);
+    }
+
+    /* افتح الوجهة */
     f_to = open(av[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
     if (f_to == -1)
     {
@@ -108,7 +116,7 @@ int main(int ac, char **av)
         exit(99);
     }
 
-    /* ضبط الصلاحيات بشكل صريح لضمان rw-rw-r-- */
+    /* ضبط الصلاحيات بشكل صريح */
     if (fchmod(f_to, 0664) == -1)
     {
         dprintf(STDERR_FILENO, "Error: Can't set permissions to %s\n", av[2]);
@@ -120,7 +128,7 @@ int main(int ac, char **av)
     /* اكتب أول بايت */
     write_all(f_to, av[2], buf, r);
 
-    /* تابع قراءة وكتابة بقية الملف */
+    /* تابع القراءة والكتابة لبقية الملف */
     while ((r = read_retry(f_from, buf, BUF, av[1])) > 0)
         write_all(f_to, av[2], buf, r);
 
@@ -129,3 +137,4 @@ int main(int ac, char **av)
 
     return 0;
 }
+
