@@ -21,27 +21,19 @@ void close_file(int fd)
 }
 
 /**
- * error_read - Handles read errors.
- * @file_from: Source file name.
+ * error_exit - Prints error and exits with code.
+ * @code: Exit code.
+ * @msg: Message format.
+ * @arg: Argument for message.
  */
-void error_read(char *file_from)
+void error_exit(int code, const char *msg, char *arg)
 {
-	dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", file_from);
-	exit(98);
+	dprintf(STDERR_FILENO, msg, arg);
+	exit(code);
 }
 
 /**
- * error_write - Handles write/create errors.
- * @file_to: Destination file name.
- */
-void error_write(char *file_to)
-{
-	dprintf(STDERR_FILENO, "Error: Can't write to %s\n", file_to);
-	exit(99);
-}
-
-/**
- * main - Copies the content of a file to another file.
+ * main - Copies content of one file to another.
  * @argc: Argument count.
  * @argv: Argument vector.
  * Return: 0 on success.
@@ -49,45 +41,29 @@ void error_write(char *file_to)
 int main(int argc, char *argv[])
 {
 	int fd_from, fd_to, rd, wr;
-	char *buffer;
+	char buffer[1024];
 
 	if (argc != 3)
-	{
-		dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
-		exit(97);
-	}
-
-	buffer = malloc(1024);
-	if (buffer == NULL)
-		error_write(argv[2]);
+		error_exit(97, "Usage: cp file_from file_to\n", "");
 
 	fd_from = open(argv[1], O_RDONLY);
 	if (fd_from == -1)
-		error_read(argv[1]);
+		error_exit(98, "Error: Can't read from file %s\n", argv[1]);
 
 	fd_to = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC, 0664);
 	if (fd_to == -1)
-	{
-		free(buffer);
-		error_write(argv[2]);
-	}
+		error_exit(99, "Error: Can't write to %s\n", argv[2]);
 
-	while ((rd = read(fd_from, buffer, 1024)) > 0)
+	while ((rd = read(fd_from, buffer, 1024)) != 0)
 	{
+		if (rd == -1)
+			error_exit(98, "Error: Can't read from file %s\n", argv[1]);
+
 		wr = write(fd_to, buffer, rd);
-		if (wr != rd)
-		{
-			free(buffer);
-			error_write(argv[2]);
-		}
-	}
-	if (rd == -1)
-	{
-		free(buffer);
-		error_read(argv[1]);
+		if (wr == -1 || wr != rd)
+			error_exit(99, "Error: Can't write to %s\n", argv[2]);
 	}
 
-	free(buffer);
 	close_file(fd_from);
 	close_file(fd_to);
 	return (0);
