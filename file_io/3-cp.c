@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/stat.h>
 
 #define BUF 1024
 
@@ -13,128 +12,78 @@
  */
 static void close_or_die(int fd)
 {
-    if (close(fd) == -1)
-    {
-        dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd);
-        exit(100);
-    }
+	if (close(fd) == -1)
+	{
+		dprintf(STDERR_FILENO, "Error: Can't close fd %d\n", fd);
+		exit(100);
+	}
 }
 
 /**
- * read_retry - read with EINTR retry; exit 98 on error
- * @fd: src fd
- * @buf: buffer
- * @n: bytes to read
- * @name: src filename (for message)
- * Return: bytes read (>= 0)
- */
-static ssize_t read_retry(int fd, char *buf, size_t n, const char *name)
-{
-    ssize_t r;
-
-    do {
-        r = read(fd, buf, n);
-    } while (r == -1 && errno == EINTR);
-
-    if (r == -1)
-    {
-        dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", name);
-        exit(98);
-    }
-    return r;
-}
-
-/**
- * write_all - write all n bytes (handles short writes/EINTR), exit 99 on error
- * @fd: dst fd
- * @name: dst filename (for message)
- * @buf: data
- * @n: bytes to write
- */
-static void write_all(int fd, const char *name, const char *buf, ssize_t n)
-{
-    ssize_t off = 0, w;
-
-    while (off < n)
-    {
-        do {
-            w = write(fd, buf + off, n - off);
-        } while (w == -1 && errno == EINTR);
-
-        if (w == -1)
-        {
-            dprintf(STDERR_FILENO, "Error: Can't write to %s\n", name);
-            exit(99);
-        }
-        off += w;
-    }
-}
-
-/**
- * main - copy file_from to file_to (1 KiB buffer)
- * @ac: argc
- * @av: argv
+ * main - copy content of a file to another file
+ * @ac: argument count
+ * @av: argument vector
  * Return: 0 on success
  */
 int main(int ac, char **av)
 {
-    int f_from, f_to;
-    ssize_t r;
-    char buf[BUF];
+	int f_from, f_to;
+	ssize_t r, w;
+	char buf[BUF];
 
-    if (ac != 3)
-    {
-        dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
-        exit(97);
-    }
+	if (ac != 3)
+	{
+		dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
+		exit(97);
+	}
 
-    /* افتح الملف المصدر */
-    f_from = open(av[1], O_RDONLY);
-    if (f_from == -1)
-    {
-        dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", av[1]);
-        exit(98);
-    }
+	/* open source file */
+	f_from = open(av[1], O_RDONLY);
+	if (f_from == -1)
+	{
+		dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", av[1]);
+		exit(98);
+	}
 
-    /* اقرأ أول بايت للتأكد من إمكانية القراءة */
-    r = read_retry(f_from, buf, 1, av[1]);
+	/* open/create destination file with truncate */
+	f_to = open(av[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
+	if (f_to == -1)
+	{
+		dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
+		close_or_die(f_from);
+		exit(99);
+	}
 
-    /* تحقق من صلاحيات الملف الوجهة إذا موجود */
-    if (access(av[2], F_OK) == 0 && access(av[2], W_OK) != 0)
-    {
-        dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
-        close_or_die(f_from);
-        exit(99);
-    }
+	/* read from source and write to destination in 1024 bytes */
+	while ((r = read(f_from, buf, BUF)) > 0)
+	{
+		ssize_t offset = 0;
 
-    /* افتح الوجهة */
-    f_to = open(av[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
-    if (f_to == -1)
-    {
-        dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
-        close_or_die(f_from);
-        exit(99);
-    }
+		/* handle short writes */
+		while (offset < r)
+		{
+			w = write(f_to, buf + offset, r - offset);
+			if (w == -1)
+			{
+				dprintf(STDERR_FILENO, "Error: Can't write to %s\n", av[2]);
+				close_or_die(f_from);
+				close_or_die(f_to);
+				exit(99);
+			}
+			offset += w;
+		}
+	}
 
-    /* ضبط الصلاحيات بشكل صريح */
-    if (fchmod(f_to, 0664) == -1)
-    {
-        dprintf(STDERR_FILENO, "Error: Can't set permissions to %s\n", av[2]);
-        close_or_die(f_from);
-        close_or_die(f_to);
-        exit(99);
-    }
+	if (r == -1)
+	{
+		dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", av[1]);
+		close_or_die(f_from);
+		close_or_die(f_to);
+		exit(98);
+	}
 
-    /* اكتب أول بايت */
-    write_all(f_to, av[2], buf, r);
+	close_or_die(f_from);
+	close_or_die(f_to);
 
-    /* تابع القراءة والكتابة لبقية الملف */
-    while ((r = read_retry(f_from, buf, BUF, av[1])) > 0)
-        write_all(f_to, av[2], buf, r);
-
-    close_or_die(f_from);
-    close_or_die(f_to);
-
-    return 0;
+	return (0);
 }
-
