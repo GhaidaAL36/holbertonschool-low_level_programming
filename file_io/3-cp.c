@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #define BUF 1024
 
@@ -87,7 +88,7 @@ int main(int ac, char **av)
         exit(97);
     }
 
-    /* افتح الملف المصدر أولاً للتأكد من إمكانية القراءة */
+    /* افتح الملف المصدر أولاً */
     f_from = open(av[1], O_RDONLY);
     if (f_from == -1)
     {
@@ -95,7 +96,10 @@ int main(int ac, char **av)
         exit(98);
     }
 
-    /* بعد التأكد من الملف المصدر، افتح أو أنشئ ملف الوجهة */
+    /* اقرأ أول بايت للتأكد من إمكانية القراءة */
+    r = read_retry(f_from, buf, 1, av[1]);
+
+    /* افتح الملف الوجهة بعد التأكد من قراءة الملف المصدر */
     f_to = open(av[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
     if (f_to == -1)
     {
@@ -104,7 +108,19 @@ int main(int ac, char **av)
         exit(99);
     }
 
-    /* قراءة وكتابة باستخدام buffer 1024 بايت */
+    /* ضبط الصلاحيات بشكل صريح لضمان rw-rw-r-- */
+    if (fchmod(f_to, 0664) == -1)
+    {
+        dprintf(STDERR_FILENO, "Error: Can't set permissions to %s\n", av[2]);
+        close_or_die(f_from);
+        close_or_die(f_to);
+        exit(99);
+    }
+
+    /* اكتب أول بايت */
+    write_all(f_to, av[2], buf, r);
+
+    /* تابع قراءة وكتابة بقية الملف */
     while ((r = read_retry(f_from, buf, BUF, av[1])) > 0)
         write_all(f_to, av[2], buf, r);
 
